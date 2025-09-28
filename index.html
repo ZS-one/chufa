@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>摄像头拍照</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+			background-color: #f5f5f5;
+			color: #333;
+			line-height: 1.6;
+		}
+
+		.container {
+			background-color: white;
+			padding: 20px;
+			min-height: 100vh;
+		}
+
+		h1 {
+			text-align: center;
+			color: #333;
+			margin-bottom: 20px;
+			font-size: 1.6rem;
+			font-weight: 600;
+		}
+
+		.video-container {
+			width: 100%;
+			margin: 20px 0;
+			position: relative;
+			overflow: hidden;
+			border-radius: 8px;
+			background-color: #fff; /* 修改为白色背景 */
+			aspect-ratio: 4/3;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+		}
+
+		.video-placeholder {
+			color: #999;
+			font-size: 16px;
+			text-align: center;
+			padding: 20px;
+		}
+
+		video {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
+		}
+
+		.controls {
+			display: flex;
+			justify-content: center;
+			gap: 15px;
+			margin: 25px 0;
+			flex-wrap: wrap;
+		}
+
+		button {
+			padding: 14px 24px;
+			font-size: 16px;
+			border: none;
+			border-radius: 5px;
+			cursor: pointer;
+			transition: all 0.3s ease;
+			-webkit-tap-highlight-color: transparent;
+			touch-action: manipulation;
+			min-width: 120px;
+		}
+
+		button:active {
+			transform: scale(0.98);
+		}
+
+		#startCamera {
+			background-color: #4CAF50;
+			color: white;
+		}
+
+		#startCamera:hover,
+		#startCamera:active {
+			background-color: #45a049;
+		}
+
+		#capture {
+			background-color: #2196F3;
+			color: white;
+		}
+
+		#capture:hover,
+		#capture:active {
+			background-color: #0b7dda;
+		}
+
+		#addImage {
+			background-color: #9C27B0;
+			color: white;
+		}
+
+		#addImage:hover,
+		#addImage:active {
+			background-color: #7B1FA2;
+		}
+
+		.status {
+			text-align: center;
+			margin: 15px 0;
+			color: #666;
+			padding: 12px;
+			border-radius: 5px;
+			font-size: 14px;
+		}
+
+		.error {
+			color: #f44336;
+			background-color: #ffebee;
+		}
+
+		.success {
+			color: #4CAF50;
+			background-color: #e8f5e9;
+		}
+
+		.warning {
+			color: #ff9800;
+			background-color: #fff3e0;
+		}
+
+		.info {
+			color: #2196F3;
+			background-color: #e3f2fd;
+		}
+
+		.image-display {
+			margin-top: 20px;
+			text-align: center;
+			border: 1px dashed #ddd;
+			border-radius: 8px;
+			padding: 15px;
+			min-height: 200px;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+		}
+
+		.image-display img {
+			max-width: 100%;
+			max-height: 50vh;
+			border-radius: 5px;
+			box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+			cursor: pointer;
+			transition: transform 0.2s ease;
+		}
+
+		.image-display img:active {
+			transform: scale(1.02);
+		}
+
+		#fileInput {
+			display: none;
+		}
+
+		/* 图片查看器样式 */
+		.image-viewer {
+			display: none;
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background-color: rgba(0, 0, 0, 0.9);
+			z-index: 1000;
+			justify-content: center;
+			align-items: center;
+		}
+
+		.image-viewer img {
+			max-width: 95%;
+			max-height: 95vh;
+			object-fit: contain;
+		}
+
+		.close-btn {
+			position: absolute;
+			top: 20px;
+			right: 20px;
+			color: white;
+			font-size: 30px;
+			cursor: pointer;
+			background: rgba(255, 255, 255, 0.2);
+			width: 40px;
+			height: 40px;
+			border-radius: 50%;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			line-height: 1;
+		}
+
+		/* 加载指示器 */
+		.loader {
+			border: 3px solid #f3f3f3;
+			border-top: 3px solid #3498db;
+			border-radius: 50%;
+			width: 30px;
+			height: 30px;
+			animation: spin 1s linear infinite;
+			margin: 0 auto;
+		}
+
+		@keyframes spin {
+			0% {
+				transform: rotate(0deg);
+			}
+
+			100% {
+				transform: rotate(360deg);
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h1>摄像头拍照功能</h1>
+
+		<div class="video-container">
+			<div class="video-placeholder" id="videoPlaceholder">
+				<span style="font-size: 14px; color: #bbb;">摄像头区域</span>
+			</div>
+			<video id="video" autoplay playsinline muted style="display: none;"></video>
+		</div>
+
+		<div class="status" id="status">点击"启动摄像头"按钮开始</div>
+
+		<div class="controls">
+			<button id="startCamera">启动摄像头</button>
+			<button id="capture" disabled>拍照</button>
+			<button id="addImage">添加图片</button>
+		</div>
+
+		<!-- 隐藏的文件输入框 -->
+		<input type="file" id="fileInput" accept="image/*">
+
+		<!-- 图片展示区域 -->
+		<div class="image-display" id="imageDisplay"></div>
+
+		<!-- 图片查看器 -->
+		<div class="image-viewer" id="imageViewer">
+			<span class="close-btn" id="closeViewer">&times;</span>
+			<img id="viewerImage" src="" alt="查看图片">
+		</div>
+	</div>
+
+	<script>
+		// 获取页面元素
+		const video = document.getElementById('video');
+		const startCameraBtn = document.getElementById('startCamera');
+		const captureBtn = document.getElementById('capture');
+		const addImageBtn = document.getElementById('addImage');
+		const fileInput = document.getElementById('fileInput');
+		const imageDisplay = document.getElementById('imageDisplay');
+		const status = document.getElementById('status');
+		const imageViewer = document.getElementById('imageViewer');
+		const viewerImage = document.getElementById('viewerImage');
+		const closeViewer = document.getElementById('closeViewer');
+		const videoPlaceholder = document.getElementById('videoPlaceholder'); // 新增的占位符元素
+
+		let stream = null;
+		let isProcessing = false; // 防止重复点击
+
+		// 检查是否在HTTPS环境下
+		function checkHTTPS() {
+			if (window.location.protocol !== 'https:' &&
+				window.location.hostname !== 'localhost' &&
+				window.location.hostname !== '127.0.0.1') {
+				const errorMsg = '摄像头访问需要在安全环境下进行（HTTPS）。';
+				status.textContent = errorMsg;
+				status.className = 'status error';
+				return false;
+			}
+			return true;
+		}
+
+		// 检查浏览器是否支持mediaDevices API
+		function checkMediaDevicesSupport() {
+			if (!navigator.mediaDevices) {
+				const errorMsg = '您的浏览器不支持媒体设备访问功能。请尝试更新浏览器。';
+				status.textContent = errorMsg;
+				status.className = 'status error';
+				console.error('navigator.mediaDevices is not supported');
+				return false;
+			}
+			return true;
+		}
+
+		// 优化视频容器尺寸以适应手机屏幕
+		function optimizeVideoSize() {
+			const videoContainer = document.querySelector('.video-container');
+
+			// 在移动设备上确保摄像头预览充满可用空间
+			if (window.innerWidth < 768) {
+				// 设置为正方形以更好地利用手机屏幕空间
+				const containerWidth = videoContainer.clientWidth;
+				videoContainer.style.height = `${containerWidth}px`;
+			}
+		}
+
+		// 显示图片
+		function displayImage(imageSrc, isCaptured = false) {
+			// 清空现有的图片
+			imageDisplay.innerHTML = '';
+
+			// 创建新的图片元素
+			const img = document.createElement('img');
+			img.src = imageSrc;
+			img.alt = isCaptured ? '拍摄的照片' : '添加的图片';
+
+			// 添加点击查看大图功能
+			img.addEventListener('click', () => {
+				viewerImage.src = imageSrc;
+				imageViewer.style.display = 'flex';
+
+				// 防止页面滚动
+				document.body.style.overflow = 'hidden';
+			});
+
+			// 将图片添加到展示区域
+			imageDisplay.appendChild(img);
+
+			// 更新状态信息
+			status.textContent = isCaptured ? '照片已拍摄并显示，点击图片可放大查看' : '图片已添加并显示，点击图片可放大查看';
+			status.className = 'status success';
+		}
+
+		// 停止摄像头的函数
+		function stopCamera() {
+			if (stream) {
+				// 停止视频流的所有轨道
+				const tracks = stream.getTracks();
+				tracks.forEach(track => track.stop());
+
+				// 清除video元素的源
+				video.srcObject = null;
+
+				// 显示占位符，隐藏视频元素
+				videoPlaceholder.style.display = 'block';
+				video.style.display = 'none';
+
+				// 更新按钮状态
+				startCameraBtn.disabled = false;
+				captureBtn.disabled = true;
+
+				// 更新状态信息
+				status.textContent = '摄像头已停止';
+				status.className = 'status';
+			}
+		}
+
+		// 启动摄像头
+		startCameraBtn.addEventListener('click', async () => {
+			// 防止重复点击
+			if (isProcessing) return;
+			isProcessing = true;
+
+			// 首先检查是否为HTTPS环境
+			if (!checkHTTPS()) {
+				isProcessing = false;
+				return;
+			}
+
+			// 然后检查浏览器是否支持mediaDevices API
+			if (!checkMediaDevicesSupport()) {
+				isProcessing = false;
+				return;
+			}
+
+			try {
+				// 添加加载状态
+				status.innerHTML = '<div class="loader"></div>正在请求摄像头权限...';
+				status.className = 'status info';
+
+				// 获取摄像头权限 - 针对手机优化的参数设置
+				const constraints = {
+					video: {
+						facingMode: {
+							ideal: 'environment' // 优先使用后置摄像头
+						},
+						width: {
+							ideal: window.innerWidth // 匹配屏幕宽度
+						},
+						height: {
+							ideal: window.innerWidth * 0.75 // 保持合适的宽高比
+						},
+						// 针对iOS设备的优化
+						videoPlaybackQuality: 'hd1080',
+						frameRate: { ideal: 30, max: 60 }
+					},
+					audio: false
+				};
+
+				// 尝试使用后置摄像头
+				stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+				// 将视频流设置为video元素的源
+				video.srcObject = stream;
+
+				// 隐藏占位符，显示视频元素
+				videoPlaceholder.style.display = 'none';
+				video.style.display = 'block';
+
+				// 添加尺寸优化
+				optimizeVideoSize();
+				window.addEventListener('resize', optimizeVideoSize);
+
+				// 更新按钮状态
+				startCameraBtn.disabled = true;
+				captureBtn.disabled = false;
+
+				// 更新状态信息
+				status.textContent = '摄像头已启动，点击"拍照"按钮进行拍照';
+				status.className = 'status success';
+			} catch (err) {
+				console.error('无法访问摄像头:', err);
+				let errorMsg = '无法访问摄像头: ';
+
+				// 根据错误类型提供更具体的提示
+				if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+					errorMsg += '用户拒绝了摄像头访问权限。请在系统设置中允许此网站访问摄像头。';
+				} else if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
+					errorMsg += '未找到可用的摄像头设备。';
+				} else if (err.name === 'NotReadableError') {
+					errorMsg += '摄像头正在被其他应用程序使用。请关闭其他使用摄像头的程序后重试。';
+				} else if (err.name === 'AbortError') {
+					errorMsg += '操作被中断。';
+				} else {
+					errorMsg += err.message || '未知错误';
+				}
+
+				status.textContent = errorMsg;
+				status.className = 'status error';
+			} finally {
+				isProcessing = false;
+			}
+		});
+
+		// 拍照功能
+		captureBtn.addEventListener('click', () => {
+			// 防止重复点击
+			if (isProcessing) return;
+			isProcessing = true;
+
+			try {
+				// 添加加载状态
+				status.innerHTML = '<div class="loader"></div>正在处理照片...';
+				status.className = 'status info';
+
+				// 创建canvas元素用于截图
+				const canvas = document.createElement('canvas');
+
+				// 优化canvas大小以适应不同设备
+				const videoWidth = video.videoWidth;
+				const videoHeight = video.videoHeight;
+
+				// 在小屏幕设备上限制canvas大小，避免过度消耗资源
+				const maxDimension = window.innerWidth * 2;
+				let targetWidth = videoWidth;
+				let targetHeight = videoHeight;
+
+				if (targetWidth > maxDimension || targetHeight > maxDimension) {
+					const aspectRatio = videoWidth / videoHeight;
+					if (aspectRatio > 1) {
+						targetWidth = maxDimension;
+						targetHeight = maxDimension / aspectRatio;
+					} else {
+						targetHeight = maxDimension;
+						targetWidth = maxDimension * aspectRatio;
+					}
+				}
+
+				canvas.width = targetWidth;
+				canvas.height = targetHeight;
+
+				// 在canvas上绘制当前视频帧
+				const ctx = canvas.getContext('2d');
+				ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+				// 将图像转换为base64数据URL
+				// 使用image/jpeg格式和0.8的质量，平衡图像质量和文件大小
+				const imageDataURL = canvas.toDataURL('image/jpeg', 0.8);
+
+				// 显示图片
+				displayImage(imageDataURL, true);
+
+				// 拍照后自动停止摄像头
+				stopCamera();
+			} catch (err) {
+				console.error('拍照过程中出现错误:', err);
+				status.textContent = '拍照过程中出现错误: ' + (err.message || '未知错误');
+				status.className = 'status error';
+			} finally {
+				isProcessing = false;
+			}
+		});
+
+		// 添加图片按钮点击事件
+		addImageBtn.addEventListener('click', () => {
+			fileInput.click();
+		});
+
+		// 文件选择器change事件
+		fileInput.addEventListener('change', (event) => {
+			const file = event.target.files[0];
+			if (file) {
+				// 检查文件大小（限制为10MB）
+				const maxSize = 10 * 1024 * 1024; // 10MB
+				if (file.size > maxSize) {
+					status.textContent = '文件大小超过限制（10MB）';
+					status.className = 'status error';
+					return;
+				}
+
+				// 添加加载状态
+				status.innerHTML = '<div class="loader"></div>正在加载图片...';
+				status.className = 'status info';
+
+				const reader = new FileReader();
+				reader.onload = function (e) {
+					// 显示图片
+					displayImage(e.target.result, false);
+				};
+				reader.onerror = function () {
+					status.textContent = '文件读取失败';
+					status.className = 'status error';
+				};
+				reader.readAsDataURL(file);
+			}
+			// 清空文件输入框，以便下次选择同一文件也能触发change事件
+			event.target.value = '';
+		});
+
+		// 关闭图片查看器
+		closeViewer.addEventListener('click', () => {
+			imageViewer.style.display = 'none';
+			document.body.style.overflow = 'auto'; // 恢复页面滚动
+		});
+
+		// 点击空白处关闭查看器
+		imageViewer.addEventListener('click', (e) => {
+			if (e.target === imageViewer) {
+				imageViewer.style.display = 'none';
+				document.body.style.overflow = 'auto'; // 恢复页面滚动
+			}
+		});
+
+		// ESC键关闭查看器
+		document.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape' && imageViewer.style.display === 'flex') {
+				imageViewer.style.display = 'none';
+				document.body.style.overflow = 'auto'; // 恢复页面滚动
+			}
+		});
+
+		// 页面加载完成后检查环境
+		window.addEventListener('DOMContentLoaded', () => {
+			// 检查HTTPS环境
+			checkHTTPS();
+
+			// 初始优化视频尺寸
+			optimizeVideoSize();
+		});
+
+		// 页面卸载前停止摄像头
+		window.addEventListener('beforeunload', () => {
+			stopCamera();
+		});
+	</script>
+</body>
+
+</html>
